@@ -1,6 +1,6 @@
 import Koa from 'koa'
 import { basename, dirname, join } from 'path'
-import { getNodeName, nodeIsDirectory, statusCodeForMissingPerm, urlToNode, vfs, VfsNode, walkNode } from './vfs'
+import { getNodeName, statusCodeForMissingPerm, nodeIsDirectory, urlToNode, vfs, VfsNode, walkNode } from './vfs'
 import { sendErrorPage } from './errorPages'
 import events from './events'
 import {
@@ -21,6 +21,7 @@ import { asyncGeneratorToReadable, deleteNode, filterMapGenerator, pathEncode, t
 import { basicWeb, detectBasicAgent } from './basicWeb'
 import { customizedIcons, ICONS_FOLDER } from './icons'
 import { getPluginInfo } from './plugins'
+import { handledWebdav } from './webdav'
 
 const serveFrontendFiles = serveGuiFiles(process.env.FRONTEND_PROXY, FRONTEND_URI)
 const serveFrontendPrefixed = mount(FRONTEND_URI.slice(0,-1), serveFrontendFiles)
@@ -52,6 +53,7 @@ export const serveGuiAndSharedFiles: Koa.Middleware = async (ctx, next) => {
         ctx.state.considerAsGui = true
         return serveFile(ctx, join(plugin?.folder || '', ICONS_FOLDER, file), MIME_AUTO)
     }
+    if (await handledWebdav(ctx)) return
     if (ctx.method === 'PUT') { // curl -T file url/
         const decPath = decodeURIComponent(path)
         let rest = basename(decPath)
@@ -105,15 +107,12 @@ export const serveGuiAndSharedFiles: Koa.Middleware = async (ctx, next) => {
     }
     if (ctx.method === 'DELETE') {
         const res = await deleteNode(ctx, node, ctx.path)
-        if (typeof res === 'number')
-            return ctx.status = res
         if (res instanceof Error) {
             ctx.body = res.message || String(res)
             return ctx.status = HTTP_SERVER_ERROR
         }
-        if (res)
-            return ctx.status = HTTP_OK
-        return
+        if (res) return
+        return ctx.status = HTTP_OK
     }
     const { get } = ctx.query
     if (node.default && path.endsWith('/') && !get) { // final/ needed on browser to make resource urls correctly with html pages
