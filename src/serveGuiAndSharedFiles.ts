@@ -111,7 +111,7 @@ export const serveGuiAndSharedFiles: Koa.Middleware = async (ctx, next) => {
             ctx.body = res.message || String(res)
             return ctx.status = HTTP_SERVER_ERROR
         }
-        if (res) return
+        if (res) return // status already set
         return ctx.status = HTTP_OK
     }
     const { get } = ctx.query

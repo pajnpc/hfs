@@ -32,7 +32,7 @@ export const CFG = constMap(['geo_enable', 'geo_allow', 'geo_list', 'geo_allow_u
     'log', 'error_log', 'log_rotation', 'dont_log_net', 'log_gui', 'log_api', 'log_ua', 'log_spam', 'track_ips',
     'max_downloads', 'max_downloads_per_ip', 'max_downloads_per_account', 'roots', 'force_address', 'split_uploads',
     'allow_session_ip_change', 'force_lang', 'suspend_plugins', 'base_url', 'size_1024', 'disable_custom_html',
-    'comments_storage'])
+    'comments_storage', 'force_webdav_login'])
 export const LIST = { add: '+', remove: '-', update: '=', props: 'props', ready: 'ready', error: 'e' }
 export type Dict<T=any> = Record<string, T>
 export type Falsy = false | null | undefined | '' | 0
@@ -295,10 +295,7 @@ export async function waitFor<T>(cb: ()=> Promisable<T>, { interval=200, timeout
     }
 }
 
-export function getOrSet<T>(o: Record<string,T> | Map<string, T>, k:string, creator:()=>T): T {
-    if (o instanceof Map)
-        return o.get(k)
-            || with_(creator(), x => o.set(k, x) && x)
+export function getOrSet<T>(o: Record<string,T>, k:string, creator:()=>T): T {
     return k in o ? o[k]!
         : (o[k] = creator())
 }

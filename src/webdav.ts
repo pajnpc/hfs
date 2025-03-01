@@ -4,7 +4,7 @@ import {
 } from './vfs'
 import {
     HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_METHOD_NOT_ALLOWED, HTTP_NO_CONTENT, HTTP_NOT_FOUND, HTTP_SERVER_ERROR,
-    enforceFinal, pathEncode, prefix, getOrSet
+    enforceFinal, pathEncode, prefix, getOrSet, Dict, Timeout, HTTP_UNAUTHORIZED, CFG
 } from './cross'
 import { PassThrough } from 'stream'
 import { mkdir, rm, stat } from 'fs/promises'
@@ -14,6 +14,10 @@ import { requestedRename } from './frontEndApis'
 import { randomUUID } from 'node:crypto'
 import { IS_MAC } from './const'
 import { exec } from 'child_process'
+import { getCurrentUsername } from './auth'
+import { defineConfig } from './config'
+
+const forceWebdavLogin = defineConfig(CFG.force_webdav_login, false)
 
 const TOKEN_HEADER = 'lock-token'
 
@@ -25,6 +29,10 @@ export async function handledWebdav(ctx: Koa.Context) {
 
     if (ctx.method === 'OPTIONS') {
         isWebDav()
+        if (forceWebdavLogin.get() && !getCurrentUsername(ctx)) {
+            ctx.status = HTTP_UNAUTHORIZED
+            return true
+        }
         ctx.body = ''
         return true
     }
@@ -170,7 +178,7 @@ export async function handledWebdav(ctx: Koa.Context) {
 }
 
 // Finder will upload special attributes as files with name ._* that can be merged using system utility "dot_clean"
-const cleaners = new Map()
+const cleaners: Dict<Timeout> = {}
 function dotClean(path: string) {
     getOrSet(cleaners, path, () => setTimeout(() => {
         try { exec('dot_clean .', { cwd: path }, (err, out) => done(err || out)) }
@@ -178,7 +186,7 @@ function dotClean(path: string) {
 
         function done(log: any) {
             console.debug('dot_clean', path, log)
-            cleaners.delete(path)
+            delete cleaners[path]
         }
     }, 10_000))
 }
